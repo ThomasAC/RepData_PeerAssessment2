@@ -1,0 +1,264 @@
+---
+title: "Reproducible_Research_Course project 2"
+author: "ThomasAC"
+date: "10/02/2016"
+output: html_document
+fig_caption: true
+keep_md: true
+
+---
+
+# The Impact of severe weather events on public health and economics in the United States (my Coursera Reproducible Research Assignement 2)
+
+Created February 2016
+
+## Synopsis
+
+Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries as well as property and crop damage. In order to better understand how to prevent such outcomes, this report aims at understanding the impact of severe weather events on public health (fatalities and injuries) and economics ( property and crop damage estimates) by exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. It appears that, over the period between 1989 and 2011, tornadoes, thunderstorms, floods and heat have a huge impact on public health, leading to high levels of both injuries and fatalities. Furthermore, tornadoes, hurricanes and floods have a high economical impact based on property and crop damage estimates. Drought and floods have the highest impact on damage to crop. This should help to prioritize resources in order to minimize the impact of such severe weather events
+
+
+## Data Processing
+
+Data originate from the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. [Storm Data](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2)
+
+Additional informations can be found at  
+ * National Weather Service [Storm Data Documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf)  
+ * National Climatic Data Center Storm Events  [FAQ](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2FNCDC%20Storm%20Events-FAQ%20Page.pdf)  
+
+The data file is a bzip2 compressed comma-separated-value file containing records from 1950 to November 2011 (but the number of observations is much lower for early years)
+
+### Loading the data
+
+```{r set-options, echo=TRUE}
+options(width = 100)
+```
+
+The following code will download the dataset in the `./data` directory and read it into R
+
+```{r, echo = TRUE}
+if( !file.exists("./data") ) { dir.create("./data") }
+if( !file.exists("./data/repdata_data_StormData.csv.bz2") ){
+    fileUrl = "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+    download.file( fileUrl, destfile="./data/repdata_data_StormData.csv.bz2", method="curl" )
+}
+if( !"StormData" %in% ls() ) {
+    StormData <- read.csv( file = "./data/repdata_data_StormData.csv.bz2",
+                           stringsAsFactors = FALSE )
+} 
+```
+
+### Selecting the data range for the anlysis
+
+This sections aims at selecting years with sufficient observations to keep for the analysis. Here is the number of observation for each year.
+
+```{r, echo = TRUE}
+### Add a date column
+StormData$date <- as.Date(StormData$BGN_DATE, format = "%m/%d/%Y")
+### Compute nuber of observations per year
+StormDataYears <- as.numeric(format(StormData$date, "%Y") )
+table(StormDataYears)
+```
+
+Only years with more than 10000 observations (1989 to 2011) and data regarding public health (Fatalities, Injuries) and economical impact (Property and Crop damages) are kept for downstream analysis.
+
+```{r, echo = TRUE}
+### Subset the dataset on selected years
+StormDataSub <- subset(StormData, date > as.Date("1988-12-31"))
+
+### Subset public health and economics data
+names(StormData)
+ColumnsSubset <- c("EVTYPE", "FATALITIES", "INJURIES", "PROPDMG",
+                   "PROPDMGEXP", "CROPDMG", "CROPDMGEXP", "date")
+StormDataSub <- StormDataSub[ , ColumnsSubset]
+```
+
+### Reduce the number of events
+
+The National Weather Service instruction note (10-1605) suggests that 48 types of severe weather events should be recorded (table 1, section 2.1).
+
+```{r, echo = TRUE }
+length(unique(StormDataSub$EVTYPE))
+```
+
+There are 985 different types of events recorded. By grouping related events in NWS categories, this number of events can be reduced to 210, which is more than good enough to proceed to the analysis (though 48 would have been better in real life situation).  
+
+```{r, echo = TRUE }
+### Convert all to upper case
+StormDataSub$EVTYPE <- toupper(StormDataSub$EVTYPE)
+
+### Replace with NWS events
+StormDataSub[grep("HURRICANE|TYPHOON", 
+                  StormDataSub$EVTYPE), ]$EVTYPE <- "HURRICANE/TYPHOON"
+StormDataSub[grep("HEAVY.*RAIN. *HEAVY|EXCESSIVE PRECIPITATION|RECORD RAINFALL ", 
+                  StormDataSub$EVTYPE), ]$EVTYPE <- "HEAVY RAIN"
+StormDataSub[grep("HEAT|HOT|WARM|DRY|DRYNESS", 
+                  StormDataSub$EVTYPE), ]$EVTYPE <- "HEAT"
+StormDataSub[grep("HIGH * TEMPERATURE", 
+                  StormDataSub$EVTYPE), ]$EVTYPE <- "HEAT"
+StormDataSub[grep("FROST|FREEZE", 
+                  StormDataSub$EVTYPE), ]$EVTYPE <- "FROST/FREEZE"
+StormDataSub[grep("BLIZZARD", 
+                  StormDataSub$EVTYPE), ]$EVTYPE <- "BLIZZARD"
+StormDataSub[grep("^THUNDERSTORM|^TSTM * WIND|WINS|WIN|WND", 
+                  StormDataSub$EVTYPE), ]$EVTYPE <- "THUNDERSTORM WIND"
+StormDataSub[grep("^TSTM", 
+                  StormDataSub$EVTYPE), ]$EVTYPE <- "THUNDERSTORM WIND"
+StormDataSub[grep("FROST|FREEZE", 
+                  StormDataSub$EVTYPE), ]$EVTYPE <- "FROST/FREEZE"
+StormDataSub[grep("^SUMMARY", 
+                  StormDataSub$EVTYPE), ]$EVTYPE <- "ToIgnore"
+StormDataSub[grep("FLASH * FLOOD", 
+                  StormDataSub$EVTYPE), ]$EVTYPE <- "FLASH FLOODING"
+StormDataSub[grep("[^FLASH] * FLOOD", 
+                  StormDataSub$EVTYPE), ]$EVTYPE <- "FLOOD"
+StormDataSub[grep("FLOOD", 
+                  StormDataSub$EVTYPE), ]$EVTYPE <- "FLOOD"
+StormDataSub[grep("^TORNADO", 
+                  StormDataSub$EVTYPE), ]$EVTYPE <- "TORNADO"
+StormDataSub[grep("^TROPICAL STORM", 
+                  StormDataSub$EVTYPE), ]$EVTYPE <- "TROPICAL STORM"
+StormDataSub[grep("FUNNEL * CLOUD", 
+                  StormDataSub$EVTYPE), ]$EVTYPE <- "FUNNEL CLOUD"
+StormDataSub[grep("SURF", 
+                  StormDataSub$EVTYPE), ]$EVTYPE <- "HIGH SURF"
+StormDataSub[grep("SNOW|SLEET|LOW TEMPERATURE|COLD WEATHER|ICY ROAD|PROLONG COLD", 
+                  StormDataSub$EVTYPE), ]$EVTYPE <- "WINTER WEATHER"
+StormDataSub[grep("HAIL", 
+                  StormDataSub$EVTYPE), ]$EVTYPE <- "HAIL"
+StormDataSub[grep("LIGHTING|LIGHTNING", 
+                  StormDataSub$EVTYPE), ]$EVTYPE <- "LIGHTNING"
+StormDataSub[grep("RECORD * COLD|COOL", 
+                  StormDataSub$EVTYPE), ]$EVTYPE <- "EXTREME COLD / WIND CHILL"
+StormDataSub[grep("RIP * CURRENT", 
+                  StormDataSub$EVTYPE), ]$EVTYPE <- "RIP CURRENT"
+StormDataSub[grep("STORM * SURGE | TIDE", 
+                  StormDataSub$EVTYPE), ]$EVTYPE <- "STORM SURGE/TIDE"
+StormDataSub[grep("WATERSPOUT|WATER SPOUT|WAYTERSPOUT", 
+                  StormDataSub$EVTYPE), ]$EVTYPE <- "WATERSPOUT"
+
+length(unique(StormDataSub$EVTYPE))
+```
+
+### Convert property and crop damage to USD on a single scale
+
+The estimated amount of damages is reported with 3 significant digits in the damage column (PROPDMG or CROPDMG) together with a code indicated the exponent (NWS note, Section 2.7). The note states that "Alphabetical characters used to signify magnitude include “K” for thousands, “M” for millions, and “B” for billions."
+
+```{r, echo = TRUE }
+unique(StormDataSub$PROPDMGEXP)
+unique(StormData$CROPDMGEXP)
+```
+
+Only entries with a valid exponent code (assuming h/H for hundreds) will be kept. The others will be given a value of 0. 
+
+```{r, echo = TRUE }
+
+### The ReplaceExp function converts character to USD multiplier
+ReplaceExp <- function(x){
+    x[ !x %in% c("h", "H","k", "K", "m", "M", "b", "B" )  ] <- "0"
+    x[ x %in% c("h", "H") ] <- "100";
+    x[ x %in% c("k", "K") ] <- "1000";
+    x[ x %in% c("m", "M") ] <- "1000000";
+    x[ x %in% c("b", "B") ] <- "1000000000";
+    x <- as.numeric(x)
+}
+
+### Replace exponent
+StormDataSub$PROPDMGEXP <- ReplaceExp(StormDataSub$PROPDMGEXP)
+StormDataSub$CROPDMGEXP <- ReplaceExp(StormDataSub$CROPDMGEXP)
+
+### Calculate amount of damage for both Property and Crop
+StormDataSub$PropertyDamage <- StormDataSub$PROPDMG * StormDataSub$PROPDMGEXP
+StormDataSub$CropDamage <- StormDataSub$CROPDMG * StormDataSub$CROPDMGEXP
+head(StormDataSub)
+```
+
+## Results
+
+### Question 1 : Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+
+The total number of both fatalities and injuries per type of events is computed and results showed as barplots for the top 15.  
+
+```{r, echo = TRUE}
+
+### Compute number of fatalities and injuries per type of event
+
+Fatalities <- with( StormDataSub, aggregate( FATALITIES ~ EVTYPE, FUN = "sum"))
+Fatalities <- Fatalities[ order(Fatalities$FATALITIES, decreasing = TRUE), ]
+
+Injuries <- with( StormDataSub, aggregate( INJURIES ~ EVTYPE, FUN = "sum"))
+Injuries <- Injuries[ order(Injuries$INJURIES, decreasing = TRUE), ]
+```
+  
+```{r, Fatalities and Injuries barplots, echo = TRUE, figure.width = 20, fig.cap = "Figure 1: Impact of severe weather events on human health"}
+library(ggplot2)
+library(gridExtra)
+
+fatalityPlot <- ggplot(Fatalities[1:15,], 
+                       aes(x = reorder(EVTYPE, FATALITIES), 
+                           y = FATALITIES) ) +
+                geom_bar( stat = "identity", fill="Steelblue" ) + 
+                labs(title="Fatalities per weather event \n (1989-2011)", 
+                     y = "Fatalities \n (number)", x = "") +
+                coord_flip()
+
+injuryPlot <- ggplot(Injuries[1:15,], 
+                     aes(x = reorder(EVTYPE, INJURIES),
+                         y = INJURIES) ) +
+              geom_bar( stat = "identity", fill="red3" ) +
+              labs(title="Injuries per weather event \n (1989-2011)",
+                   y = "Injuries \n (number)", x = "") +
+              coord_flip()
+
+grid.arrange(fatalityPlot, injuryPlot, ncol=2)
+```
+
+This shows that Heat, Tornadoes, Thunderstorm winds floods and lightnings have the most severe impact on public health. Tornadoes associates with high levels of both fatalities and injuries while Heat episodes have a severe impact on mortality.
+
+### Question 2: Across the United States, which types of events have the greatest economic consequences?
+
+The amount of property and crop damages are computed fro each type of events and results shown as a barplot for the top 15.
+
+```{r, echo = TRUE}
+Property <- with( StormDataSub, aggregate( PropertyDamage ~ EVTYPE, FUN = "sum"))
+Property <- Property[ order(Property$PropertyDamage, decreasing = TRUE), ]
+
+Crop <- with( StormDataSub, aggregate( CropDamage ~ EVTYPE, FUN = "sum"))
+Crop <- Crop[ order(Crop$CropDamage, decreasing = TRUE), ]
+```
+
+```{r, Property and Crop damages barplots, echo = TRUE, figure.width = 15, fig.cap = "Figure 2: Impact of severe weather events on propery and crop damage"}
+propertyPlot <- ggplot(Property[1:15,], aes(x = reorder(EVTYPE, PropertyDamage), 
+                                            y = PropertyDamage) ) +
+                geom_bar( stat = "identity", fill="orchid" ) + 
+                labs(title="Damages to property \n per weather event (1989-2011)", 
+                     y = "Property damages \n (USD)", x = "") +
+                coord_flip() + 
+                theme(title=element_text(size=12), axis.text.x=element_text(size=9),axis.text.y=element_text( size=9))
+
+cropPlot <- ggplot(Crop[1:15,], aes(x = reorder(EVTYPE, CropDamage), 
+                                    y = CropDamage) ) +
+            geom_bar( stat = "identity", fill="seagreen3" ) + 
+            labs(title="Damages to crop \n per weather event (1989-2011)", 
+                 y = "Property damages \n (USD)", x = "") + 
+            coord_flip() +
+            theme(title=element_text(size=12), axis.text.x=element_text(size=9),axis.text.y=element_text( size=9))
+#theme(axis.text.x=element_text(size=8,colour="gray19",face="bold"),axis.text.y=element_text(colour="gray19",size=8,face="bold"))
+grid.arrange(propertyPlot, cropPlot, ncol=2)
+grid.arrange(propertyPlot,cropPlot,
+             ncol=2,widths=c(10/10, 10/20))
+             
+
+```
+
+Floods and hurricanes (or typhoons) lead to high property  and crop damages costs. Drough and high storm have a specific impact on damages to crops.
+
+## Conclusion
+
+Over the period between 1989 and 2011, tornadoes, thunderstorms, floods and heat have a huge impact on public health, leading to high levels of both injuries and fatalities. Tornadoes, hurricanes and floods have a high economical impact based on property and crop damage estimates. Drought and floods have the highest impact on damages to crop.
+
+## Appendix: Session info
+
+```{r, echo = TRUE}
+sessionInfo()
+```
+
