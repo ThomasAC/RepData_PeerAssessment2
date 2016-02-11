@@ -1,11 +1,13 @@
 ---
-title: "Reproducible_Research_Course project 2"
-author: "ThomasAC"
-date: "10/02/2016"
-output: html_document
-fig_caption: true
-keep_md: true
-
+title: "Reproducible_Research_Course_project 2"
+author: "Me"
+date: "11/02/2016"
+output:
+  html_document:
+    fig_caption: yes
+    fig_height: 7
+    fig_width: 18
+    keep_md: yes
 ---
 
 # The Impact of severe weather events on public health and economics in the United States (my Coursera Reproducible Research Assignement 2)
@@ -28,10 +30,6 @@ Additional informations can be found at
 The data file is a bzip2 compressed comma-separated-value file containing records from 1950 to November 2011 (but the number of observations is much lower for early years)
 
 ### Loading the data
-
-```{r set-options, echo=TRUE}
-options(width = 100)
-```
 
 The following code will download the dataset in the `./data` directory and read it into R
 
@@ -232,20 +230,20 @@ propertyPlot <- ggplot(Property[1:15,], aes(x = reorder(EVTYPE, PropertyDamage),
                 geom_bar( stat = "identity", fill="orchid" ) + 
                 labs(title="Damages to property \n per weather event (1989-2011)", 
                      y = "Property damages \n (USD)", x = "") +
-                coord_flip() + 
-                theme(title=element_text(size=12), axis.text.x=element_text(size=9),axis.text.y=element_text( size=9))
+                coord_flip() 
+               # theme(title=element_text(size=12), axis.text.x=element_text(size=9),axis.text.y=element_text( size=9))
 
 cropPlot <- ggplot(Crop[1:15,], aes(x = reorder(EVTYPE, CropDamage), 
                                     y = CropDamage) ) +
             geom_bar( stat = "identity", fill="seagreen3" ) + 
             labs(title="Damages to crop \n per weather event (1989-2011)", 
                  y = "Property damages \n (USD)", x = "") + 
-            coord_flip() +
-            theme(title=element_text(size=12), axis.text.x=element_text(size=9),axis.text.y=element_text( size=9))
+            coord_flip()
+            #theme(title=element_text(size=12), axis.text.x=element_text(size=9),axis.text.y=element_text( size=9))
 #theme(axis.text.x=element_text(size=8,colour="gray19",face="bold"),axis.text.y=element_text(colour="gray19",size=8,face="bold"))
 grid.arrange(propertyPlot, cropPlot, ncol=2)
-grid.arrange(propertyPlot,cropPlot,
-             ncol=2,widths=c(10/10, 10/20))
+#grid.arrange(propertyPlot,cropPlot,
+ #            ncol=2,widths=c(10/10, 10/20))
              
 
 ```
@@ -261,4 +259,3 @@ Over the period between 1989 and 2011, tornadoes, thunderstorms, floods and heat
 ```{r, echo = TRUE}
 sessionInfo()
 ```
-
